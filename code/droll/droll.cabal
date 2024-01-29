@@ -1,0 +1,72 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.35.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           droll
+version:        0.0.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Types
+      Parser
+      Calculator
+  other-modules:
+      CalculatorImpl
+      ParserImpl
+      Paths_droll
+  hs-source-dirs:
+      src
+  ghc-options: -W
+  build-depends:
+      base
+    , containers
+    , mtl
+    , parsec
+    , random
+    , text
+  default-language: Haskell2010
+
+executable droll
+  main-is: Main.hs
+  other-modules:
+      Calculator
+      CalculatorImpl
+      Parser
+      ParserImpl
+      Types
+      Paths_droll
+  hs-source-dirs:
+      src
+      app
+  build-depends:
+      base
+    , containers
+    , mtl
+    , parsec
+    , random
+    , text
+  default-language: Haskell2010
+
+test-suite primary-test-suite
+  type: exitcode-stdio-1.0
+  main-is: BlackBox.hs
+  other-modules:
+      Paths_droll
+  hs-source-dirs:
+      tests
+  build-depends:
+      QuickCheck
+    , base
+    , containers
+    , droll
+    , mtl
+    , parsec
+    , random
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+    , text
+  default-language: Haskell2010
