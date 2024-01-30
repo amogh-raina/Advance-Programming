@@ -1,0 +1,194 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<style type="text/css">
+span.lineno { color: white; background: #aaaaaa; border-right: solid white 12px }
+span.nottickedoff { background: yellow}
+span.istickedoff { background: white }
+span.tickonlyfalse { margin: -1px; border: 1px solid #f20913; background: #f20913 }
+span.tickonlytrue  { margin: -1px; border: 1px solid #60de51; background: #60de51 }
+span.funcount { font-size: small; color: orange; z-index: 2; position: absolute; right: 20 }
+span.decl { font-weight: bold }
+span.spaces    { background: white }
+</style>
+</head>
+<body>
+<pre>
+<span class="decl"><span class="nottickedoff">never executed</span> <span class="tickonlytrue">always true</span> <span class="tickonlyfalse">always false</span></span>
+</pre>
+<pre>
+<span class="lineno">    1 </span>-- Put your calculator implementation in this file
+<span class="lineno">    2 </span>-- Suppress warning for old-style monad definitions
+<span class="lineno">    3 </span>{-# OPTIONS_GHC -Wno-noncanonical-monad-instances #-}
+<span class="lineno">    4 </span>
+<span class="lineno">    5 </span>module CalculatorImpl where
+<span class="lineno">    6 </span>
+<span class="lineno">    7 </span>import Types
+<span class="lineno">    8 </span>
+<span class="lineno">    9 </span>import Control.Monad
+<span class="lineno">   10 </span>import Data.Ratio (Rational, (%))
+<span class="lineno">   11 </span>import qualified Data.Map as Map
+<span class="lineno">   12 </span>import Data.Maybe (catMaybes)
+<span class="lineno">   13 </span>import qualified Data.Bifunctor
+<span class="lineno">   14 </span>
+<span class="lineno">   15 </span>-- The type constructor PD is defined in Types
+<span class="lineno">   16 </span>instance <span class="decl"><span class="nottickedoff">Monad PD</span></span> where
+<span class="lineno">   17 </span>  <span class="decl"><span class="nottickedoff">return x = PD [(1, x)]</span></span>
+<span class="lineno">   18 </span>  <span class="decl"><span class="nottickedoff">(PD xs) &gt;&gt;= f = PD $ concatMap (\(p, x) -&gt; scaleProb p (runPD (f x))) xs</span>
+<span class="lineno">   19 </span><span class="spaces">    </span><span class="nottickedoff">where</span>
+<span class="lineno">   20 </span><span class="spaces">      </span><span class="nottickedoff">scaleProb p ys = [(p * q, y) | (q, y) &lt;- ys]</span></span>
+<span class="lineno">   21 </span>
+<span class="lineno">   22 </span>
+<span class="lineno">   23 </span>-- You shouldn't need to modify these
+<span class="lineno">   24 </span>instance <span class="decl"><span class="nottickedoff"><span class="decl"><span class="nottickedoff"><span class="decl"><span class="nottickedoff">Applicative PD</span></span></span></span></span></span> where
+<span class="lineno">   25 </span>  <span class="decl"><span class="nottickedoff">pure = return</span></span>; <span class="decl"><span class="nottickedoff">(&lt;*&gt;) = ap</span></span>
+<span class="lineno">   26 </span>instance <span class="decl"><span class="nottickedoff">Functor PD</span></span> where
+<span class="lineno">   27 </span>  <span class="decl"><span class="nottickedoff">fmap = liftM</span></span>
+<span class="lineno">   28 </span>
+<span class="lineno">   29 </span>-- | `uniform` generates a uniform probability distribution for the integers from 0 to n-1.
+<span class="lineno">   30 </span>-- If n is zero or negative, it will produce an error as a uniform distribution is not defined for these cases.
+<span class="lineno">   31 </span>uniform :: Int -&gt; PD Int
+<span class="lineno">   32 </span><span class="decl"><span class="istickedoff">uniform n</span>
+<span class="lineno">   33 </span><span class="spaces">  </span><span class="istickedoff">| <span class="tickonlytrue">n &gt; 0</span> = PD [(<span class="nottickedoff">1 % fromIntegral n</span>, x) | x &lt;- [1..n]]</span>
+<span class="lineno">   34 </span><span class="spaces">  </span><span class="istickedoff">| <span class="nottickedoff">otherwise</span> = <span class="nottickedoff">error &quot;uniform: non-positive argument&quot;</span></span></span>
+<span class="lineno">   35 </span>
+<span class="lineno">   36 </span>
+<span class="lineno">   37 </span>normalize :: Ord a =&gt; PD a -&gt; PD a
+<span class="lineno">   38 </span><span class="decl"><span class="istickedoff">normalize (PD xs) = PD $ map normalizeProb $ accumulate xs</span>
+<span class="lineno">   39 </span><span class="spaces">  </span><span class="istickedoff">where</span>
+<span class="lineno">   40 </span><span class="spaces">    </span><span class="istickedoff">-- accumulate goes through each (probability, outcome) pair and accumulates probabilities for each unique outcome</span>
+<span class="lineno">   41 </span><span class="spaces">    </span><span class="istickedoff">accumulate :: Ord a =&gt; [(Prob, a)] -&gt; [(Prob, a)]</span>
+<span class="lineno">   42 </span><span class="spaces">    </span><span class="istickedoff">accumulate [] = []</span>
+<span class="lineno">   43 </span><span class="spaces">    </span><span class="istickedoff">accumulate ((p, x):ys) = (totalP, x) : accumulate (filter ((/= x) . snd) ys)</span>
+<span class="lineno">   44 </span><span class="spaces">      </span><span class="istickedoff">where</span>
+<span class="lineno">   45 </span><span class="spaces">        </span><span class="istickedoff">totalP = p + sum [<span class="nottickedoff">pi</span> | (pi, xi) &lt;- ys, <span class="tickonlyfalse">xi == x</span>]</span>
+<span class="lineno">   46 </span><span class="spaces"></span><span class="istickedoff"></span>
+<span class="lineno">   47 </span><span class="spaces">    </span><span class="istickedoff">-- normalizeProb adjusts each probability to ensure the total is 1</span>
+<span class="lineno">   48 </span><span class="spaces">    </span><span class="istickedoff">normalizeProb :: (Prob, a) -&gt; (Prob, a)</span>
+<span class="lineno">   49 </span><span class="spaces">    </span><span class="istickedoff">normalizeProb (p, x) = (p / totalProb, x)</span>
+<span class="lineno">   50 </span><span class="spaces"></span><span class="istickedoff"></span>
+<span class="lineno">   51 </span><span class="spaces">    </span><span class="istickedoff">-- Calculate the total probability of the original list</span>
+<span class="lineno">   52 </span><span class="spaces">    </span><span class="istickedoff">totalProb = sum $ map fst xs</span></span>
+<span class="lineno">   53 </span>
+<span class="lineno">   54 </span>expectation :: Fractional a =&gt; PD (Maybe a) -&gt; (Prob, a)
+<span class="lineno">   55 </span><span class="decl"><span class="nottickedoff">expectation (PD xs) = if successProb == 0</span>
+<span class="lineno">   56 </span><span class="spaces">                      </span><span class="nottickedoff">then error &quot;Expected value is undefined&quot;</span>
+<span class="lineno">   57 </span><span class="spaces">                      </span><span class="nottickedoff">else (successProb, weightedAvg)</span>
+<span class="lineno">   58 </span><span class="spaces">  </span><span class="nottickedoff">where</span>
+<span class="lineno">   59 </span><span class="spaces">    </span><span class="nottickedoff">justVals = [(p, x) | (p, Just x) &lt;- xs]</span>
+<span class="lineno">   60 </span><span class="spaces">    </span><span class="nottickedoff">successProb = sum $ map fst justVals</span>
+<span class="lineno">   61 </span><span class="spaces">    </span><span class="nottickedoff">weightedAvg = sum [fromRational p * x | (p, x) &lt;- justVals] / fromRational successProb</span></span>
+<span class="lineno">   62 </span>
+<span class="lineno">   63 </span>
+<span class="lineno">   64 </span>-- The type Bag is defined in Types
+<span class="lineno">   65 </span>union :: Bag -&gt; Bag -&gt; Bag
+<span class="lineno">   66 </span><span class="decl"><span class="istickedoff">union (Bag xs) (Bag ys) = Bag (merge xs ys)</span>
+<span class="lineno">   67 </span><span class="spaces">  </span><span class="istickedoff">where</span>
+<span class="lineno">   68 </span><span class="spaces">    </span><span class="istickedoff">merge [] bs = bs</span>
+<span class="lineno">   69 </span><span class="spaces">    </span><span class="istickedoff">merge as [] = as</span>
+<span class="lineno">   70 </span><span class="spaces">    </span><span class="istickedoff">merge (a:as) (b:bs)</span>
+<span class="lineno">   71 </span><span class="spaces">      </span><span class="istickedoff">| a &lt; b     = a : merge as (b:bs)</span>
+<span class="lineno">   72 </span><span class="spaces">      </span><span class="istickedoff">| <span class="tickonlytrue">otherwise</span> = b : merge (a:as) bs</span></span>
+<span class="lineno">   73 </span>
+<span class="lineno">   74 </span>type Value = Bag  -- all elements must be &gt;=0
+<span class="lineno">   75 </span>
+<span class="lineno">   76 </span>type Store = [(VName,Value)] -- all vnames must be distinct
+<span class="lineno">   77 </span>
+<span class="lineno">   78 </span>newtype Calc a = Calc {<span class="istickedoff"><span class="decl"><span class="istickedoff">runCalc</span></span></span> :: Store -&gt; PD (Either RunError (a,Store))}
+<span class="lineno">   79 </span>
+<span class="lineno">   80 </span>instance <span class="decl"><span class="istickedoff">Monad Calc</span></span> where
+<span class="lineno">   81 </span>  <span class="decl"><span class="istickedoff">return x = Calc $ \s -&gt; PD [(1, Right (x, s))]</span></span>
+<span class="lineno">   82 </span>  <span class="decl"><span class="istickedoff">(Calc c) &gt;&gt;= f = Calc $ \s -&gt; PD $ do</span>
+<span class="lineno">   83 </span><span class="spaces">      </span><span class="istickedoff">(prob, result) &lt;- runPD (c s)</span>
+<span class="lineno">   84 </span><span class="spaces">      </span><span class="istickedoff">case result of</span>
+<span class="lineno">   85 </span><span class="spaces">          </span><span class="istickedoff">Left err -&gt; <span class="nottickedoff">[(prob, Left err)]</span></span>
+<span class="lineno">   86 </span><span class="spaces">          </span><span class="istickedoff">Right (a, s') -&gt; runPD $ runCalc (f a) s'</span></span>
+<span class="lineno">   87 </span>
+<span class="lineno">   88 </span>-- You shouldn't need to modify these
+<span class="lineno">   89 </span>instance <span class="decl"><span class="istickedoff"><span class="decl"><span class="nottickedoff"><span class="decl"><span class="nottickedoff">Applicative Calc</span></span></span></span></span></span> where
+<span class="lineno">   90 </span>  <span class="decl"><span class="istickedoff">pure = return</span></span>; <span class="decl"><span class="istickedoff">(&lt;*&gt;) = ap</span></span>
+<span class="lineno">   91 </span>instance <span class="decl"><span class="nottickedoff">Functor Calc</span></span> where
+<span class="lineno">   92 </span>  <span class="decl"><span class="istickedoff">fmap = liftM</span></span>
+<span class="lineno">   93 </span>
+<span class="lineno">   94 </span>fault :: RunError -&gt; Calc a
+<span class="lineno">   95 </span><span class="decl"><span class="istickedoff">fault re = Calc $ \_ -&gt; PD [(1, Left re)]</span></span>
+<span class="lineno">   96 </span>
+<span class="lineno">   97 </span>lookVar :: VName -&gt; Calc (Maybe Value)
+<span class="lineno">   98 </span><span class="decl"><span class="istickedoff">lookVar x = Calc $ \s -&gt; PD [(<span class="nottickedoff">1</span>, Right (lookup x s, s))]</span></span>
+<span class="lineno">   99 </span>
+<span class="lineno">  100 </span>setVar :: VName -&gt; Maybe Value -&gt; Calc ()
+<span class="lineno">  101 </span><span class="decl"><span class="istickedoff">setVar x mv = Calc $ \s -&gt; PD [(<span class="nottickedoff">1</span>, Right (<span class="nottickedoff">()</span>, updateStore x mv <span class="nottickedoff">s</span>))]</span>
+<span class="lineno">  102 </span><span class="spaces">  </span><span class="istickedoff">where</span>
+<span class="lineno">  103 </span><span class="spaces">    </span><span class="istickedoff">updateStore :: VName -&gt; Maybe Value -&gt; Store -&gt; Store</span>
+<span class="lineno">  104 </span><span class="spaces">    </span><span class="istickedoff">updateStore varName maybeVal store =</span>
+<span class="lineno">  105 </span><span class="spaces">      </span><span class="istickedoff">case maybeVal of</span>
+<span class="lineno">  106 </span><span class="spaces">        </span><span class="istickedoff">Just val -&gt; (varName, val) : <span class="nottickedoff">filter ((varName /=) . fst) store</span></span>
+<span class="lineno">  107 </span><span class="spaces">        </span><span class="istickedoff">Nothing  -&gt; <span class="nottickedoff">filter ((varName /=) . fst) store</span></span></span>
+<span class="lineno">  108 </span>
+<span class="lineno">  109 </span>pick :: PD a -&gt; Calc a
+<span class="lineno">  110 </span><span class="decl"><span class="istickedoff">pick pd = Calc $ \s -&gt; PD $ concatMap (\(prob, val) -&gt; [(<span class="nottickedoff">prob</span>, Right (val, <span class="nottickedoff">s</span>))]) (runPD pd)</span></span>
+<span class="lineno">  111 </span>
+<span class="lineno">  112 </span>eval :: Exp -&gt; Calc Value
+<span class="lineno">  113 </span><span class="decl"><span class="istickedoff">eval (Cst i)       = return $ Bag [i] -- Constant integers are represented as singleton bags.</span>
+<span class="lineno">  114 </span><span class="spaces"></span><span class="istickedoff">eval (Var v)       = do -- Look up a variable and return its value.</span>
+<span class="lineno">  115 </span><span class="spaces">  </span><span class="istickedoff">maybeValue &lt;- lookVar v</span>
+<span class="lineno">  116 </span><span class="spaces">  </span><span class="istickedoff">case maybeValue of</span>
+<span class="lineno">  117 </span><span class="spaces">    </span><span class="istickedoff">Just value -&gt; return value</span>
+<span class="lineno">  118 </span><span class="spaces">    </span><span class="istickedoff">Nothing -&gt; fault $ Unbound v &quot;Variable not found&quot;</span>
+<span class="lineno">  119 </span><span class="spaces"></span><span class="istickedoff">eval (Join exps)   = do -- Evaluate each expression and join their results.</span>
+<span class="lineno">  120 </span><span class="spaces">  </span><span class="istickedoff">bags &lt;- mapM eval exps</span>
+<span class="lineno">  121 </span><span class="spaces">  </span><span class="istickedoff">return $ foldr union (Bag []) bags</span>
+<span class="lineno">  122 </span><span class="spaces"></span><span class="istickedoff">eval (Let v e1 me2) = do -- Evaluate e1, bind its value to v, then evaluate me2 if present.</span>
+<span class="lineno">  123 </span><span class="spaces">  </span><span class="istickedoff">val1 &lt;- eval e1</span>
+<span class="lineno">  124 </span><span class="spaces">  </span><span class="istickedoff">setVar v (Just val1)</span>
+<span class="lineno">  125 </span><span class="spaces">  </span><span class="istickedoff">case me2 of</span>
+<span class="lineno">  126 </span><span class="spaces">    </span><span class="istickedoff">Just e2 -&gt; eval e2</span>
+<span class="lineno">  127 </span><span class="spaces">    </span><span class="istickedoff">Nothing -&gt; <span class="nottickedoff">return val1</span></span>
+<span class="lineno">  128 </span><span class="spaces"></span><span class="istickedoff">eval (Seq e1 e2) = eval e1 &gt;&gt; eval e2</span>
+<span class="lineno">  129 </span><span class="spaces"></span><span class="istickedoff">eval (Is e1 e2) = <span class="nottickedoff">do</span></span>
+<span class="lineno">  130 </span><span class="spaces">  </span><span class="istickedoff"><span class="nottickedoff">val1 &lt;- eval e1</span></span>
+<span class="lineno">  131 </span><span class="spaces">  </span><span class="istickedoff"><span class="nottickedoff">val2 &lt;- eval e2</span></span>
+<span class="lineno">  132 </span><span class="spaces">  </span><span class="istickedoff"><span class="nottickedoff">return $ if val1 == val2 then Bag [1] else Bag []</span></span>
+<span class="lineno">  133 </span><span class="spaces"></span><span class="istickedoff">eval (Sum e) = do</span>
+<span class="lineno">  134 </span><span class="spaces">  </span><span class="istickedoff">Bag ints &lt;- eval e</span>
+<span class="lineno">  135 </span><span class="spaces">  </span><span class="istickedoff">return $ Bag [sum ints]</span>
+<span class="lineno">  136 </span><span class="spaces"></span><span class="istickedoff">eval (Count e) = <span class="nottickedoff">do</span></span>
+<span class="lineno">  137 </span><span class="spaces">  </span><span class="istickedoff"><span class="nottickedoff">Bag ints &lt;- eval e</span></span>
+<span class="lineno">  138 </span><span class="spaces">  </span><span class="istickedoff"><span class="nottickedoff">return $ Bag [length ints]</span></span>
+<span class="lineno">  139 </span><span class="spaces"></span><span class="istickedoff">eval (Times e1 e2) = <span class="nottickedoff">do</span></span>
+<span class="lineno">  140 </span><span class="spaces">  </span><span class="istickedoff"><span class="nottickedoff">Bag ints1 &lt;- eval e1</span></span>
+<span class="lineno">  141 </span><span class="spaces">  </span><span class="istickedoff"><span class="nottickedoff">Bag ints2 &lt;- eval e2</span></span>
+<span class="lineno">  142 </span><span class="spaces">  </span><span class="istickedoff"><span class="nottickedoff">return $ Bag [x * y | x &lt;- ints1, y &lt;- ints2]</span></span>
+<span class="lineno">  143 </span><span class="spaces"></span><span class="istickedoff">eval (Roll e) = do</span>
+<span class="lineno">  144 </span><span class="spaces">  </span><span class="istickedoff">Bag ints &lt;- eval e</span>
+<span class="lineno">  145 </span><span class="spaces">  </span><span class="istickedoff">if <span class="tickonlyfalse">null ints</span> then <span class="nottickedoff">fault $ EmptyChoice &quot;Cannot roll an empty bag&quot;</span></span>
+<span class="lineno">  146 </span><span class="spaces">  </span><span class="istickedoff">else do</span>
+<span class="lineno">  147 </span><span class="spaces">    </span><span class="istickedoff">let n = head ints</span>
+<span class="lineno">  148 </span><span class="spaces">    </span><span class="istickedoff">if n &lt;= 0 then</span>
+<span class="lineno">  149 </span><span class="spaces">        </span><span class="istickedoff">fault $ OtherError &quot;Cannot roll a die with non-positive sides&quot;</span>
+<span class="lineno">  150 </span><span class="spaces">    </span><span class="istickedoff">else do</span>
+<span class="lineno">  151 </span><span class="spaces">        </span><span class="istickedoff">rolledNumber &lt;- pick $ uniform n</span>
+<span class="lineno">  152 </span><span class="spaces">        </span><span class="istickedoff">return $ Bag [rolledNumber]</span>
+<span class="lineno">  153 </span><span class="spaces"></span><span class="istickedoff">eval (Take sel v) = <span class="nottickedoff">do</span></span>
+<span class="lineno">  154 </span><span class="spaces">  </span><span class="istickedoff"><span class="nottickedoff">maybeVal &lt;- lookVar v</span></span>
+<span class="lineno">  155 </span><span class="spaces">  </span><span class="istickedoff"><span class="nottickedoff">case maybeVal of</span></span>
+<span class="lineno">  156 </span><span class="spaces">    </span><span class="istickedoff"><span class="nottickedoff">Just (Bag ints) -&gt; case sel of</span></span>
+<span class="lineno">  157 </span><span class="spaces">      </span><span class="istickedoff"><span class="nottickedoff">Min -&gt; return . Bag $ [minimum ints | not (null ints)]</span></span>
+<span class="lineno">  158 </span><span class="spaces">      </span><span class="istickedoff"><span class="nottickedoff">Max -&gt; return . Bag $ [maximum ints | not (null ints)]</span></span>
+<span class="lineno">  159 </span><span class="spaces">      </span><span class="istickedoff"><span class="nottickedoff">Rand -&gt; if null ints then fault $ EmptyChoice &quot;Cannot pick from an empty bag&quot;</span></span>
+<span class="lineno">  160 </span><span class="spaces">              </span><span class="istickedoff"><span class="nottickedoff">else pick $ uniform (length ints) &gt;&gt;= \i -&gt; return $ Bag [ints !! i]</span></span>
+<span class="lineno">  161 </span><span class="spaces">    </span><span class="istickedoff"><span class="nottickedoff">Nothing -&gt; fault $ Unbound v &quot;Variable not found in Take&quot;</span></span></span>
+<span class="lineno">  162 </span>
+<span class="lineno">  163 </span>
+<span class="lineno">  164 </span>evaluate :: Exp -&gt; PD (Either RunError Value)
+<span class="lineno">  165 </span><span class="decl"><span class="istickedoff">evaluate exp = normalize $ PD $ concatMap processOutcome (runPD outcomesPD)</span>
+<span class="lineno">  166 </span><span class="spaces">  </span><span class="istickedoff">where</span>
+<span class="lineno">  167 </span><span class="spaces">    </span><span class="istickedoff"><span class="nottickedoff">initialStore = [] :: Store</span></span>
+<span class="lineno">  168 </span><span class="spaces">    </span><span class="istickedoff">outcomesPD = runCalc (eval exp) <span class="nottickedoff">initialStore</span></span>
+<span class="lineno">  169 </span><span class="spaces">    </span><span class="istickedoff">processOutcome :: (Prob, Either RunError (Value, Store)) -&gt; [(Prob, Either RunError Value)]</span>
+<span class="lineno">  170 </span><span class="spaces">    </span><span class="istickedoff">processOutcome (prob, Right (val, _)) = [(prob, Right val)]</span>
+<span class="lineno">  171 </span><span class="spaces">    </span><span class="istickedoff">processOutcome (prob, Left err) = [(prob, Left err)]</span></span>
+
+</pre>
+</body>
+</html>

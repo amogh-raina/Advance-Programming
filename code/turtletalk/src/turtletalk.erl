@@ -2,6 +2,7 @@
 -export([line_segment/3,dead_turtle/2,clone_turtle_map/6,get_canvas/1,count_turtles/1, collect_live_turtle_pictures/2,collect_dead_turtle_pictures/2]).
 -export([new_canvas/0, blast/1, new_turtle/1, picture/1, turtles/1, graveyard/1]).
 -export([forward/2, anti/2, clock/2, setpen/2, clone/2, position/1]).
+-export([start/0]).
 
 %-type position() :: {integer(), integer()}.
 %-type line_seg() :: {position(), position()}.
@@ -191,7 +192,30 @@ end;
             io:format("Invalid message received by Turtle.~n"),
             turtle_loop(C, {X, Y}, Angle, PenState)
     end.
+=======
+-record(turtle, {id, x, y, angle, pen}).
+-define(TURTLE_MAP, global_turtle_map).
 
+start() ->
+    set_turtle_map(maps:new()),
+    % Other initialization code
+    ok.
+
+get_turtle_state(TurtleID) ->
+    case maps:get(TurtleID, ?TURTLE_MAP, undefined) of
+        undefined -> {error, "Turtle not found"};
+        TurtleState -> {ok, TurtleState}
+    end.
+
+% Function to update the state of a turtle
+update_turtle_state(TurtleID, TurtleState) ->
+    case maps:is_key(TurtleID, ?TURTLE_MAP) of
+        false -> {error, "Turtle not found"};
+        true -> 
+            NewMap = maps:put(TurtleID, TurtleState, ?TURTLE_MAP),
+            set_turtle_map(NewMap),
+            ok
+    end.
 
 
 %% Canvas API
