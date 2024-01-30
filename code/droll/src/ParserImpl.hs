@@ -15,7 +15,7 @@ parseExp input = case parse (expParser <* eof) "" input of
 
 -- Main parser for expressions (Exp)
 expParser :: Parser T.Exp
-expParser = try rollParser <|> try letParser <|> additionParser <|> sExpParser
+expParser = rollParser <|>  letParser <|>  additionParser <|> try sExpParser
 
 letParser :: Parser T.Exp
 letParser = do
@@ -27,7 +27,11 @@ letParser = do
   string "be"
   spaces
   exp1 <- sExpParser
-  option (T.Let varName exp1 Nothing) (letInExpParser varName exp1)
+  spaces
+  string "in"
+  spaces
+  notFollowedBy (string "") -- Ensures that the next parser doesn't match the empty string
+  T.Let varName exp1 . Just <$> expParser
 
 letInExpParser :: String -> T.Exp -> Parser T.Exp
 letInExpParser varName exp1 = do
@@ -42,16 +46,12 @@ rollParser :: Parser T.Exp
 rollParser = do
     string "roll"
     spaces
-    expr <- exprInParentheses <|> (T.Var <$> vNameParser)
+    expr <- try (exprInParentheses <* spaces) <|> sExpParser
     return $ T.Roll expr
 
 -- Define a separate parser for expressions within parentheses
 exprInParentheses :: Parser T.Exp
-exprInParentheses = between
-    (char '(' >> spaces)
-    (spaces >> char ')' >> spaces)
-    expParser
-
+exprInParentheses = between (char '(' *> spaces) (spaces <* char ')') expParser
 
 -- Parser for simple expressions (SExp)
 sExpParser :: Parser T.Exp
@@ -70,14 +70,14 @@ addOp = do
     return (\exp1 exp2 -> T.Sum (T.Join [exp1, exp2]))
 
 basicSExpParser :: Parser T.Exp
-basicSExpParser = try numParser
-               <|> try takeParser
-               <|> try countParser
-               <|> try sumParser 
-               <|> try varParser
-               <|> try joinParser
-               <|> try timesParser
-               <|> try comparisonParser
+basicSExpParser =  numParser
+               <|>  takeParser
+               <|>  countParser
+               <|>  sumParser
+               <|>  varParser
+               <|>  joinParser
+               <|>  timesParser
+               <|>  comparisonParser
 
 
 numParser :: Parser T.Exp
@@ -168,8 +168,15 @@ comparisonLevelParser = try comparisonParser <|> timesLevelParser
 joinParser :: Parser T.Exp
 joinParser = do
     char '('
-    exps <- sepBy sExpParser (char ',')
+    exps <- sepBy expParser (spaces >> char ',' >> spaces)
     char ')'
-    return $ case exps of
-        [] -> T.Join []  -- Empty bag
-        _  -> T.Join exps
+    return $ flattenJoins exps
+
+flattenJoins :: [T.Exp] -> T.Exp
+flattenJoins exps = let flattened = concatMap (\e -> case e of
+                                                       T.Join es -> es
+                                                       _ -> [e])
+                                              exps
+                    in case flattened of
+                         [e] -> e  -- Avoid single-expression Joins
+                         _ -> T.Join flattened

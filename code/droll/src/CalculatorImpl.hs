@@ -7,10 +7,7 @@ module CalculatorImpl where
 import Types
 
 import Control.Monad
-import Data.Ratio (Rational, (%))
-import qualified Data.Map as Map
-import Data.Maybe (catMaybes)
-import qualified Data.Bifunctor
+import Data.Ratio ((%))
 
 -- The type constructor PD is defined in Types
 instance Monad PD where
@@ -50,8 +47,6 @@ normalize (PD xs) = PD $ map normalizeProb $ accumulate xs
 
     -- Calculate the total probability of the original list
     totalProb = sum $ map fst xs
-
-
 
 expectation :: Fractional a => PD (Maybe a) -> (Prob, a)
 expectation (PD xs) = if successProb == 0

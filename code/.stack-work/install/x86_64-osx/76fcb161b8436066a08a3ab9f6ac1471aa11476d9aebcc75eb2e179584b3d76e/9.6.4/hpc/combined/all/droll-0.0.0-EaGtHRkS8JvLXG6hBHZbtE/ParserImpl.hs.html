@@ -1,0 +1,205 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<style type="text/css">
+span.lineno { color: white; background: #aaaaaa; border-right: solid white 12px }
+span.nottickedoff { background: yellow}
+span.istickedoff { background: white }
+span.tickonlyfalse { margin: -1px; border: 1px solid #f20913; background: #f20913 }
+span.tickonlytrue  { margin: -1px; border: 1px solid #60de51; background: #60de51 }
+span.funcount { font-size: small; color: orange; z-index: 2; position: absolute; right: 20 }
+span.decl { font-weight: bold }
+span.spaces    { background: white }
+</style>
+</head>
+<body>
+<pre>
+<span class="decl"><span class="nottickedoff">never executed</span> <span class="tickonlytrue">always true</span> <span class="tickonlyfalse">always false</span></span>
+</pre>
+<pre>
+<span class="lineno">    1 </span>-- Put your parser implementation in this file
+<span class="lineno">    2 </span>module ParserImpl where
+<span class="lineno">    3 </span>
+<span class="lineno">    4 </span>import Types
+<span class="lineno">    5 </span>
+<span class="lineno">    6 </span>-- import ReadP or Parsec as relevant
+<span class="lineno">    7 </span>import Text.Parsec
+<span class="lineno">    8 </span>import Text.Parsec.String (Parser)
+<span class="lineno">    9 </span>import qualified Types as T
+<span class="lineno">   10 </span>
+<span class="lineno">   11 </span>parseExp :: String -&gt; Either String Exp
+<span class="lineno">   12 </span><span class="decl"><span class="istickedoff">parseExp input = case parse (expParser &lt;* eof) &quot;&quot; input of</span>
+<span class="lineno">   13 </span><span class="spaces">    </span><span class="istickedoff">Left err -&gt; Left $ <span class="nottickedoff">show err</span></span>
+<span class="lineno">   14 </span><span class="spaces">    </span><span class="istickedoff">Right expr -&gt; Right expr</span></span>
+<span class="lineno">   15 </span>
+<span class="lineno">   16 </span>-- Main parser for expressions (Exp)
+<span class="lineno">   17 </span>expParser :: Parser T.Exp
+<span class="lineno">   18 </span><span class="decl"><span class="istickedoff">expParser = rollParser &lt;|&gt;  letParser &lt;|&gt;  additionParser &lt;|&gt; <span class="nottickedoff">try sExpParser</span></span></span>
+<span class="lineno">   19 </span>
+<span class="lineno">   20 </span>letParser :: Parser T.Exp
+<span class="lineno">   21 </span><span class="decl"><span class="istickedoff">letParser = do</span>
+<span class="lineno">   22 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">   23 </span><span class="spaces">  </span><span class="istickedoff">string &quot;let&quot;</span>
+<span class="lineno">   24 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">   25 </span><span class="spaces">  </span><span class="istickedoff">varName &lt;- vNameParser</span>
+<span class="lineno">   26 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">   27 </span><span class="spaces">  </span><span class="istickedoff">string &quot;be&quot;</span>
+<span class="lineno">   28 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">   29 </span><span class="spaces">  </span><span class="istickedoff">exp1 &lt;- sExpParser</span>
+<span class="lineno">   30 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">   31 </span><span class="spaces">  </span><span class="istickedoff">string &quot;in&quot;</span>
+<span class="lineno">   32 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">   33 </span><span class="spaces">  </span><span class="istickedoff">notFollowedBy (string &quot;&quot;) -- Ensures that the next parser doesn't match the empty string</span>
+<span class="lineno">   34 </span><span class="spaces">  </span><span class="istickedoff">T.Let varName exp1 . Just &lt;$&gt; expParser</span></span>
+<span class="lineno">   35 </span>
+<span class="lineno">   36 </span>letInExpParser :: String -&gt; T.Exp -&gt; Parser T.Exp
+<span class="lineno">   37 </span><span class="decl"><span class="nottickedoff">letInExpParser varName exp1 = do</span>
+<span class="lineno">   38 </span><span class="spaces">  </span><span class="nottickedoff">string &quot;in&quot;</span>
+<span class="lineno">   39 </span><span class="spaces">  </span><span class="nottickedoff">spaces</span>
+<span class="lineno">   40 </span><span class="spaces">  </span><span class="nottickedoff">T.Let varName exp1 . Just &lt;$&gt; expParser</span></span>
+<span class="lineno">   41 </span>
+<span class="lineno">   42 </span>vNameParser :: Parser String
+<span class="lineno">   43 </span><span class="decl"><span class="istickedoff">vNameParser = many1 letter</span></span>
+<span class="lineno">   44 </span>
+<span class="lineno">   45 </span>rollParser :: Parser T.Exp
+<span class="lineno">   46 </span><span class="decl"><span class="istickedoff">rollParser = do</span>
+<span class="lineno">   47 </span><span class="spaces">    </span><span class="istickedoff">string &quot;roll&quot;</span>
+<span class="lineno">   48 </span><span class="spaces">    </span><span class="istickedoff">spaces</span>
+<span class="lineno">   49 </span><span class="spaces">    </span><span class="istickedoff">expr &lt;- try (exprInParentheses &lt;* spaces) &lt;|&gt; <span class="nottickedoff">sExpParser</span></span>
+<span class="lineno">   50 </span><span class="spaces">    </span><span class="istickedoff">return $ T.Roll expr</span></span>
+<span class="lineno">   51 </span>
+<span class="lineno">   52 </span>-- Define a separate parser for expressions within parentheses
+<span class="lineno">   53 </span>exprInParentheses :: Parser T.Exp
+<span class="lineno">   54 </span><span class="decl"><span class="istickedoff">exprInParentheses = between (char '(' *&gt; spaces) (spaces &lt;* char ')') expParser</span></span>
+<span class="lineno">   55 </span>
+<span class="lineno">   56 </span>-- Parser for simple expressions (SExp)
+<span class="lineno">   57 </span>sExpParser :: Parser T.Exp
+<span class="lineno">   58 </span><span class="decl"><span class="istickedoff">sExpParser = try additionParser &lt;|&gt; <span class="nottickedoff">basicSExpParser</span></span></span>
+<span class="lineno">   59 </span>
+<span class="lineno">   60 </span>-- Addition operator '+'
+<span class="lineno">   61 </span>additionParser :: Parser T.Exp
+<span class="lineno">   62 </span><span class="decl"><span class="istickedoff">additionParser = comparisonLevelParser `chainl1` addOp</span></span>
+<span class="lineno">   63 </span>
+<span class="lineno">   64 </span>-- Addition operation parser
+<span class="lineno">   65 </span>addOp :: Parser (T.Exp -&gt; T.Exp -&gt; T.Exp)
+<span class="lineno">   66 </span><span class="decl"><span class="istickedoff">addOp = do</span>
+<span class="lineno">   67 </span><span class="spaces">    </span><span class="istickedoff">spaces</span>
+<span class="lineno">   68 </span><span class="spaces">    </span><span class="istickedoff">char '+'</span>
+<span class="lineno">   69 </span><span class="spaces">    </span><span class="istickedoff">spaces</span>
+<span class="lineno">   70 </span><span class="spaces">    </span><span class="istickedoff">return (\exp1 exp2 -&gt; T.Sum (T.Join [exp1, exp2]))</span></span>
+<span class="lineno">   71 </span>
+<span class="lineno">   72 </span>basicSExpParser :: Parser T.Exp
+<span class="lineno">   73 </span><span class="decl"><span class="istickedoff">basicSExpParser =  numParser</span>
+<span class="lineno">   74 </span><span class="spaces">               </span><span class="istickedoff">&lt;|&gt;  takeParser</span>
+<span class="lineno">   75 </span><span class="spaces">               </span><span class="istickedoff">&lt;|&gt;  countParser</span>
+<span class="lineno">   76 </span><span class="spaces">               </span><span class="istickedoff">&lt;|&gt;  sumParser</span>
+<span class="lineno">   77 </span><span class="spaces">               </span><span class="istickedoff">&lt;|&gt;  varParser</span>
+<span class="lineno">   78 </span><span class="spaces">               </span><span class="istickedoff">&lt;|&gt;  joinParser</span>
+<span class="lineno">   79 </span><span class="spaces">               </span><span class="istickedoff">&lt;|&gt;  <span class="nottickedoff">timesParser</span></span>
+<span class="lineno">   80 </span><span class="spaces">               </span><span class="istickedoff"><span class="nottickedoff">&lt;|&gt;  comparisonParser</span></span></span>
+<span class="lineno">   81 </span>
+<span class="lineno">   82 </span>
+<span class="lineno">   83 </span>numParser :: Parser T.Exp
+<span class="lineno">   84 </span><span class="decl"><span class="istickedoff">numParser = do</span>
+<span class="lineno">   85 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">   86 </span><span class="spaces">  </span><span class="istickedoff">num &lt;- many1 digit</span>
+<span class="lineno">   87 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">   88 </span><span class="spaces">  </span><span class="istickedoff">return $ T.Cst (read num)</span></span>
+<span class="lineno">   89 </span>
+<span class="lineno">   90 </span>varParser :: Parser T.Exp
+<span class="lineno">   91 </span><span class="decl"><span class="istickedoff">varParser = try $ do</span>
+<span class="lineno">   92 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">   93 </span><span class="spaces">  </span><span class="istickedoff">var &lt;- many1 letter</span>
+<span class="lineno">   94 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">   95 </span><span class="spaces">  </span><span class="istickedoff">return $ T.Var var</span></span>
+<span class="lineno">   96 </span>
+<span class="lineno">   97 </span>sumParser :: Parser T.Exp
+<span class="lineno">   98 </span><span class="decl"><span class="istickedoff">sumParser = do</span>
+<span class="lineno">   99 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  100 </span><span class="spaces">  </span><span class="istickedoff">string &quot;sum&quot;</span>
+<span class="lineno">  101 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  102 </span><span class="spaces">  </span><span class="istickedoff">T.Sum &lt;$&gt; additionWithoutSumParser</span></span>
+<span class="lineno">  103 </span>
+<span class="lineno">  104 </span>-- New parser for handling addition without wrapping in Sum
+<span class="lineno">  105 </span>additionWithoutSumParser :: Parser T.Exp
+<span class="lineno">  106 </span><span class="decl"><span class="istickedoff">additionWithoutSumParser = comparisonLevelParser `chainl1` addOpWithoutSum</span></span>
+<span class="lineno">  107 </span>
+<span class="lineno">  108 </span>-- Modified addition operation parser without Sum
+<span class="lineno">  109 </span>addOpWithoutSum :: Parser (T.Exp -&gt; T.Exp -&gt; T.Exp)
+<span class="lineno">  110 </span><span class="decl"><span class="istickedoff">addOpWithoutSum = do</span>
+<span class="lineno">  111 </span><span class="spaces">    </span><span class="istickedoff">spaces</span>
+<span class="lineno">  112 </span><span class="spaces">    </span><span class="istickedoff">char '+'</span>
+<span class="lineno">  113 </span><span class="spaces">    </span><span class="istickedoff">spaces</span>
+<span class="lineno">  114 </span><span class="spaces">    </span><span class="istickedoff">return (\exp1 exp2 -&gt; T.Join [exp1, exp2])</span></span>
+<span class="lineno">  115 </span>
+<span class="lineno">  116 </span>countParser :: Parser T.Exp
+<span class="lineno">  117 </span><span class="decl"><span class="istickedoff">countParser = do</span>
+<span class="lineno">  118 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  119 </span><span class="spaces">  </span><span class="istickedoff">string &quot;count&quot;</span>
+<span class="lineno">  120 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  121 </span><span class="spaces">  </span><span class="istickedoff">T.Count &lt;$&gt; sExpParser</span></span>
+<span class="lineno">  122 </span>
+<span class="lineno">  123 </span>-- 'times' operator (right associative)
+<span class="lineno">  124 </span>timesParser :: Parser T.Exp
+<span class="lineno">  125 </span><span class="decl"><span class="istickedoff">timesParser = do</span>
+<span class="lineno">  126 </span><span class="spaces">  </span><span class="istickedoff">exp1 &lt;- basicSExpParser</span>
+<span class="lineno">  127 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  128 </span><span class="spaces">  </span><span class="istickedoff">string &quot;times&quot;</span>
+<span class="lineno">  129 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  130 </span><span class="spaces">  </span><span class="istickedoff">exp2 &lt;- expParser -- Right associativity: allow timesParser to be nested on the right</span>
+<span class="lineno">  131 </span><span class="spaces">  </span><span class="istickedoff">return $ T.Times exp1 exp2</span></span>
+<span class="lineno">  132 </span>
+<span class="lineno">  133 </span>-- Intermediate precedence level for 'times'
+<span class="lineno">  134 </span>timesLevelParser :: Parser T.Exp
+<span class="lineno">  135 </span><span class="decl"><span class="istickedoff">timesLevelParser = try timesParser &lt;|&gt; basicSExpParser</span></span>
+<span class="lineno">  136 </span>
+<span class="lineno">  137 </span>takeParser :: Parser T.Exp
+<span class="lineno">  138 </span><span class="decl"><span class="istickedoff">takeParser = do</span>
+<span class="lineno">  139 </span><span class="spaces">  </span><span class="istickedoff">try (string &quot;take&quot;) -- Use 'try' for backtracking if needed</span>
+<span class="lineno">  140 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  141 </span><span class="spaces">  </span><span class="istickedoff">sel &lt;- (string &quot;highest&quot; &gt;&gt; return T.Max) &lt;|&gt; <span class="nottickedoff">(string &quot;lowest&quot; &gt;&gt; return T.Min) &lt;|&gt; (string &quot;any&quot; &gt;&gt; return T.Rand)</span></span>
+<span class="lineno">  142 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  143 </span><span class="spaces">  </span><span class="istickedoff">string &quot;from&quot;</span>
+<span class="lineno">  144 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  145 </span><span class="spaces">  </span><span class="istickedoff">case sel of</span>
+<span class="lineno">  146 </span><span class="spaces">    </span><span class="istickedoff">T.Max -&gt; T.Take Max &lt;$&gt; vNameParser</span>
+<span class="lineno">  147 </span><span class="spaces">    </span><span class="istickedoff">_ -&gt; <span class="nottickedoff">T.Take sel &lt;$&gt; numParserC</span></span></span>
+<span class="lineno">  148 </span>
+<span class="lineno">  149 </span>numParserC :: Parser String
+<span class="lineno">  150 </span><span class="decl"><span class="nottickedoff">numParserC = do</span>
+<span class="lineno">  151 </span><span class="spaces">  </span><span class="nottickedoff">spaces</span>
+<span class="lineno">  152 </span><span class="spaces">  </span><span class="nottickedoff">num &lt;- many1 digit</span>
+<span class="lineno">  153 </span><span class="spaces">  </span><span class="nottickedoff">spaces</span>
+<span class="lineno">  154 </span><span class="spaces">  </span><span class="nottickedoff">return num</span></span>
+<span class="lineno">  155 </span>
+<span class="lineno">  156 </span>-- Comparison operators ('is', 'is not')
+<span class="lineno">  157 </span>comparisonParser :: Parser T.Exp
+<span class="lineno">  158 </span><span class="decl"><span class="istickedoff">comparisonParser = do</span>
+<span class="lineno">  159 </span><span class="spaces">  </span><span class="istickedoff">exp1 &lt;- timesLevelParser</span>
+<span class="lineno">  160 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  161 </span><span class="spaces">  </span><span class="istickedoff">_ &lt;- try (string &quot;is not&quot;) &lt;|&gt; string &quot;is&quot;</span>
+<span class="lineno">  162 </span><span class="spaces">  </span><span class="istickedoff">spaces</span>
+<span class="lineno">  163 </span><span class="spaces">  </span><span class="istickedoff">Is exp1 &lt;$&gt; timesLevelParser</span></span>
+<span class="lineno">  164 </span>
+<span class="lineno">  165 </span>comparisonLevelParser :: Parser T.Exp
+<span class="lineno">  166 </span><span class="decl"><span class="istickedoff">comparisonLevelParser = try comparisonParser &lt;|&gt; timesLevelParser</span></span>
+<span class="lineno">  167 </span>
+<span class="lineno">  168 </span>joinParser :: Parser T.Exp
+<span class="lineno">  169 </span><span class="decl"><span class="istickedoff">joinParser = do</span>
+<span class="lineno">  170 </span><span class="spaces">    </span><span class="istickedoff">char '('</span>
+<span class="lineno">  171 </span><span class="spaces">    </span><span class="istickedoff">exps &lt;- sepBy expParser (spaces &gt;&gt; char ',' &gt;&gt; <span class="nottickedoff">spaces</span>)</span>
+<span class="lineno">  172 </span><span class="spaces">    </span><span class="istickedoff">char ')'</span>
+<span class="lineno">  173 </span><span class="spaces">    </span><span class="istickedoff">return $ <span class="nottickedoff">flattenJoins exps</span></span></span>
+<span class="lineno">  174 </span>
+<span class="lineno">  175 </span>flattenJoins :: [T.Exp] -&gt; T.Exp
+<span class="lineno">  176 </span><span class="decl"><span class="nottickedoff">flattenJoins exps = let flattened = concatMap (\e -&gt; case e of</span>
+<span class="lineno">  177 </span><span class="spaces">                                                       </span><span class="nottickedoff">T.Join es -&gt; es</span>
+<span class="lineno">  178 </span><span class="spaces">                                                       </span><span class="nottickedoff">_ -&gt; [e])</span>
+<span class="lineno">  179 </span><span class="spaces">                                              </span><span class="nottickedoff">exps</span>
+<span class="lineno">  180 </span><span class="spaces">                    </span><span class="nottickedoff">in case flattened of</span>
+<span class="lineno">  181 </span><span class="spaces">                         </span><span class="nottickedoff">[e] -&gt; e  -- Avoid single-expression Joins</span>
+<span class="lineno">  182 </span><span class="spaces">                         </span><span class="nottickedoff">_ -&gt; T.Join flattened</span></span>
+
+</pre>
+</body>
+</html>

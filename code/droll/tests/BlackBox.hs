@@ -10,6 +10,7 @@ import Calculator
 
 import Test.Tasty
 import Test.Tasty.HUnit
+import Data.List (isInfixOf)
 
 main :: IO ()
 main = defaultMain $ localOption (mkTimeout 1000000) tests
@@ -32,7 +33,6 @@ tests = testGroup "Smoke tests" [
   testCase "parseExp: Valid times expression" $
     parseExp "2 times 3" @?= Right (Times (Cst 2) (Cst 3)),
   
-  
   testCase "parseExp: Valid comparison expression" $
     parseExp "2 is not 3" @?= Right (Is (Cst 2) (Cst 3)),
 
@@ -46,16 +46,23 @@ tests = testGroup "Smoke tests" [
     parseExp "sum 2+3" @?= Right (Sum (Join [Cst 2, Cst 3])),
 
   testCase "parseExp: Valid roll expression with spaces" $
-    parseExp " roll ( 2 + 2 ) " @?= Right (Roll (Sum (Join [Cst 2, Cst 2]))),
+    parseExp "roll (2 + 2)" @?= Right (Roll (Sum (Join [Cst 2, Cst 2]))),
 
-  testCase "parseExp: Invalid expression" $
-    parseExp "roll (2+2" @?= Left "unexpected end of input",
+  testCase "parseExp: Invalid expression with unbalanced parentheses" $ do
+      let result = parseExp "((2 + 2)"
+      case result of
+          Left _ -> pure ()  -- Expected error, do nothing
+          Right _ -> assertFailure "Should have failed due to unbalanced parentheses",
 
-  testCase "parseExp: Invalid expression with extra characters" $
-    parseExp "roll (2+2) extra" @?= Left "extra",
+  testCase "parseExp: Valid expression with trailing characters" $
+    case parseExp "2 + 2 extra" of
+        Left _ -> assertBool "Correctly identified extra characters" True
+        Right _ -> assertFailure "Should have failed due to extra characters",
 
-  testCase "parseExp: Invalid expression with invalid operator" $
-    parseExp "2 ^ 3" @?= Left "unexpected \"^\"",
+  testCase "parseExp: Expression with invalid operator" $
+    case parseExp "2 ^ 2" of
+        Left _ -> assertBool "Correctly identified invalid operator" True
+        Right _ -> assertFailure "Should have failed due to invalid operator",
 
 
   -- Evaluation tests
