@@ -16,7 +16,6 @@ instance Monad PD where
     where
       scaleProb p ys = [(p * q, y) | (q, y) <- ys]
 
-
 -- You shouldn't need to modify these
 instance Applicative PD where
   pure = return; (<*>) = ap
@@ -29,7 +28,6 @@ uniform :: Int -> PD Int
 uniform n
   | n > 0 = PD [(1 % fromIntegral n, x) | x <- [1..n]]
   | otherwise = error "uniform: non-positive argument"
-
 
 normalize :: Ord a => PD a -> PD a
 normalize (PD xs) = PD $ map normalizeProb $ accumulate xs
@@ -56,7 +54,6 @@ expectation (PD xs) = if successProb == 0
     justVals = [(p, x) | (p, Just x) <- xs]
     successProb = sum $ map fst justVals
     weightedAvg = sum [fromRational p * x | (p, x) <- justVals] / fromRational successProb
-
 
 -- The type Bag is defined in Types
 union :: Bag -> Bag -> Bag
@@ -156,7 +153,6 @@ eval (Take sel v) = do
       Rand -> if null ints then fault $ EmptyChoice "Cannot pick from an empty bag"
               else pick $ uniform (length ints) >>= \i -> return $ Bag [ints !! i]
     Nothing -> fault $ Unbound v "Variable not found in Take"
-
 
 evaluate :: Exp -> PD (Either RunError Value)
 evaluate exp = normalize $ PD $ concatMap processOutcome (runPD outcomesPD)

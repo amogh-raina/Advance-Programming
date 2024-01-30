@@ -79,7 +79,6 @@ basicSExpParser =  numParser
                <|>  timesParser
                <|>  comparisonParser
 
-
 numParser :: Parser T.Exp
 numParser = do
   spaces
