@@ -9,11 +9,11 @@
 
 %%%% Helper Functions %%%%
 %%% Add a line segment in the canvas map for turtle T's drawing history
-line_segment(CanvasMap, T, {PositionA, PositionB}) ->
-    {DoA, Segment} = maps:get(T, CanvasMap),
-    UpdateSegment = Segment ++ [{PositionA, PositionB}],
-    UpdatedCanvasMap = maps:put(T, {DoA, UpdateSegment}, CanvasMap),
-    UpdatedCanvasMap.
+%add_line_segment(CanvasMap, T, {PositionA, PositionB}) ->
+    %{_, Segment} = maps:get(T, CanvasMap),
+    %UpdateSegment = Segment ++ [{PositionA, PositionB}],
+    %UpdatedCanvasMap = maps:put(T, {alive, UpdateSegment}, CanvasMap),
+    %UpdatedCanvasMap.
 
 %% Logic of dead turtle
 dead_turtle(CanvasMap, T) ->
@@ -43,8 +43,9 @@ collect_dead_turtle_pictures([{_, {dead, TurtleData}} | Rest], Pictures) ->
     collect_dead_turtle_pictures(Rest, [TurtlePictures | Pictures]);
 collect_dead_turtle_pictures([_|Rest], Pictures) ->
     collect_dead_turtle_pictures(Rest, Pictures).
-%% Get Canvas Map
-get_canvas(_) -> implement. 
+%% Get Canvas Map from CanvasID
+
+%get_canvas(CanvasID) -> implement. 
 
 %% Clone Turtle Map Function
 clone_turtle_map(_C, _Position, _Angle, _PenState, TurtleList, 0) ->
@@ -58,23 +59,39 @@ new_canvas() ->
    spawn(fun() -> canvas_loop(#{}) end).
 % Initialize a turtle process with a given canvas ID
 new_turtle(CanvasId) ->
+    TurtleID = self(),
     Position = {0, 0},
     Angle = 0,
     PenState = up,
-    CanvasMap = get_canvas(CanvasId),
-    line_segment(CanvasMap, self(), {{0,0}, {0,0}}),
+    CanvasId ! {add_new_turtle, TurtleID},
+    receive
+        {turtle_added, TurtleID} ->
+            io:format("Turtle ~p successfully added to canvas ~p.~n", [TurtleID, CanvasId]),
+            {ok, TurtleID};
+        _ ->
+            io:format("Error: Failed to add turtle ~p to canvas ~p.~n", [TurtleID, CanvasId]),
+            {error, failed_to_add_turtle}
+    end,
     spawn(fun() -> 
         turtle_loop(CanvasId, Position, Angle, PenState) end).
+
 
 %% Turtle Loop API
 turtle_loop(C, {X, Y}, Angle, PenState) -> 
     receive
+
         {From, forward, N} when is_integer(N) ->
             CurrentTurtle = {C, {X, Y}, Angle, PenState},
             case N of
                 0 ->
                     From ! {reply, ok, CurrentTurtle},
                     turtle_loop(C, {X, Y}, Angle, PenState);
+                N when N < 0 ->
+                {ok, CanvasMap} = get_canvas(C),
+                dead_turtle(CanvasMap, self()),
+                From ! {error, invalid_message},
+                turtle_loop(C, {X, Y}, Angle, PenState);
+
                 N when N > 0 ->
                     NewPosition =
                         case Angle of
@@ -91,20 +108,23 @@ turtle_loop(C, {X, Y}, Angle, PenState) ->
                         end,
             NewTurtle = {C, NewPosition, Angle, PenState},
             if PenState == down ->
-                line_segment(C, self(), {{X,Y}, NewPosition});
-                PenState == up ->
-                    io:format("Pen is up.~n"),
-                    {reply,ok, CurrentTurtle}
-                    end,
-             From ! {reply, ok, NewTurtle},
-            turtle_loop(C, NewPosition, Angle, PenState);
+                line_segment(C, self(), {{X,Y}, NewPosition}),
+                NewTurtle = {C, NewPosition, Angle, PenState},
+                From ! {reply, ok, NewTurtle},
+                turtle_loop(C, NewPosition, Angle, PenState);
+            PenState == up ->
+                io:format("Pen is up.~n"),
+                NewTurtle = {C, NewPosition, Angle, PenState},
+                From ! {reply, ok, NewTurtle},
+                turtle_loop(C, NewPosition, Angle, PenState)
+            end;
 
         _ -> 
-        {ok, CanvasMap} = get_canvas(C),
-        dead_turtle(CanvasMap, self()),
-        From ! {error, invalid_message},
-            turtle_loop(C, {X, Y}, Angle, PenState)
-            
+            {ok, CanvasMap} = get_canvas(C),
+                dead_turtle(CanvasMap, self()),
+                From ! {error, invalid_forward_value}, % Handle the case when N is not an integer
+                turtle_loop(C, {X, Y}, Angle, PenState)
+           
 end;
 
     {From, anti, Degree} ->
@@ -180,6 +200,17 @@ end;
 % Canvas loop function
 canvas_loop(Canvas) ->
     receive
+        {add_new_turtle, TurtleID} ->
+            UpdatedCanvasMap = maps:put(TurtleID, {alive, []}, Canvas),
+            TurtleID ! {turtle_added, TurtleID},
+            canvas_loop(UpdatedCanvasMap);
+        {add_line_segment, TurtleID, LineSegment} ->
+            % Extract existing turtle data
+            {Status, Segments} = maps:get(TurtleID, Canvas, {alive, []}),
+            UpdatedSegments = Segments ++ [LineSegment],
+            UpdatedCanvasMap = maps:put(TurtleID, {Status, UpdatedSegments}, Canvas),
+            canvas_loop(UpdatedCanvasMap);
+
         {_, blast} ->
             {reply, ok};
         {From, picture} -> 
@@ -210,7 +241,9 @@ canvas_loop(Canvas) ->
             io:format("Invalid message received by Canvas.~n"),
             canvas_loop(Canvas)
     end.
-
+%%%%%%%%%%%
+line_segment(CanvasID, TurtleID, LineSegment) ->
+    CanvasID ! {add_line_segment, TurtleID, LineSegment}.
 
 
 % Receive calls for Turtle_loop
@@ -252,6 +285,13 @@ position(T) ->
     end.
 
 %% Receive calls for Canvas_loop
+get_canvas(CanvasID) ->
+    CanvasID ! {self(), get_canvas},
+    receive
+        {canvas_map, CanvasMap} ->
+            CanvasMap
+    end.
+
 blast(Canvas) ->
     Canvas ! {self(), blast},
     receive
