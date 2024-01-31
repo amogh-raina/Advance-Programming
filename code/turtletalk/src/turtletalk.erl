@@ -28,8 +28,10 @@ forward(T, N) when is_integer(N), N >= 0 ->
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
     
-init(InitialState) ->
-        {ok, InitialState}.
+init(_Args) ->
+    InitialState = #{position => {0, 0}, angle => 0, pen => up, turtles => [], dead_pictures => []},
+    {ok, InitialState}.
+    
 
 terminate(Reason, _State) ->
     %% Handle any cleanup needed when the server terminates.
@@ -38,18 +40,23 @@ terminate(Reason, _State) ->
     ok.
 
 %% Turtle Process Handling
+handle_call(_Request, _From, _State) ->
+    {reply, {error, "Invalid request or state"}, _State};
 handle_call({forward, N}, _From, State = #{position := {X, Y}, angle := Angle}) ->
     NewPosition = case Angle of
         0 -> {X + N, Y};      % East
-        90 -> {X, Y + N};     % North
+        90 -> {X, Y - N};     % North
         180 -> {X - N, Y};    % West
-        270 -> {X, Y - N}     % South
+        270 -> {X, Y + N}     % South
         %% Add more cases if you support more angles
     end,
     NewState = State#{position => NewPosition},
     {reply, ok, NewState}; % Reply with 'ok' and update the state
-handle_call({forward, _N}, _From, State) ->
-    {reply, {error, invalid_input}, State};
+handle_call({forward, N}, _From, State = #{position := {X, Y}, angle := Angle}) ->
+    %% Forward operation as before
+    {reply, ok, State};
+handle_call(get_position, _From, State = #{position := Position}) ->
+    {reply, {ok, Position}, State};
 handle_call({rotate, Degrees}, _From, State = #{angle := Angle}) ->
     NewAngle = (360 + Angle + Degrees) rem 360, % Ensure positive result
     NewState = State#{angle => NewAngle},
@@ -75,7 +82,14 @@ handle_call(get_turtles, _From, State = #{turtles := Turtles}) ->
 handle_call(get_graveyard, _From, State = #{dead_pictures := DeadPictures}) ->
     {reply, {ok, DeadPictures}, State};
 handle_call({get_state, _TurtleID}, _From, State) ->
-    {reply, {state_response, State}, State}.
+    {reply, {state_response, State}, State};
+handle_call(get_picture, _From, State) ->
+    % Assuming 'State' holds a simple representation of the picture or can easily aggregate turtle paths
+    Picture = compile_picture(State),
+    {reply, {ok, Picture}, State};
+handle_call({update_position, TurtleID, NewPosition}, _From, State) ->
+    NewState = update_turtle_position(State, TurtleID, NewPosition),
+    {reply, ok, NewState}.
     
 handle_cast(blast, State = #{turtles := Turtles}) ->
     lists:foreach(fun(TurtlePid) -> gen_server:cast(TurtlePid, stop) end, Turtles),
@@ -90,6 +104,16 @@ create_turtle_clone(CanvasID, Position, Angle, Pen) ->
     {ok, TurtleID} = turtletalk:new_turtle(CanvasID, #{position => Position, angle => Angle, pen => Pen}),
     TurtleID.
 
+compile_picture(State = #{turtles := TurtlesPositions}) ->
+    % For this example, let's assume 'TurtlesPositions' is a map or list of positions
+    % This function would then compile these into a "picture"
+    % Here, we'll just return the positions directly for simplicity
+        lists:map(fun({TurtleID, Pos}) -> {TurtleID, Pos} end, TurtlesPositions).
+
+update_turtle_position(State = #{turtles := Turtles}, TurtleID, NewPosition) ->
+    NewTurtles = maps:put(TurtleID, NewPosition, Turtles),
+    State#{turtles => NewTurtles}.
+        
 get_turtle_state(T) ->
     T ! {self(), {get_state, T}},
     receive
@@ -239,14 +263,17 @@ blast(CanvasPid) ->
     gen_server:cast(CanvasPid, blast),
     ok.
     
-new_turtle(CanvasPid) ->
+new_turtle(CanvasPid) when is_pid(CanvasPid) ->
     InitialState = #{position => {0, 0}, angle => 0, pen => up, canvas => CanvasPid},
-    {ok, TurtlePid} = start_link(),
+    {ok, TurtlePid} = gen_server:start_link(?MODULE, InitialState, []),
     gen_server:cast(CanvasPid, {add_turtle, TurtlePid}),
-    {ok, TurtlePid}.
+    {ok, TurtlePid};
+new_turtle({ok, CanvasPid}) when is_pid(CanvasPid) ->
+    new_turtle(CanvasPid). % Call the corrected version with just the PID
+    
 
 picture(CanvasPid) ->
-    gen_server:call(CanvasPid, get_picture).
+    gen_server:call(CanvasPid, get_picture, 50000).
 
 turtles(CanvasPid) ->
     gen_server:call(CanvasPid, get_turtles, 5000). % Timeout after 5000ms

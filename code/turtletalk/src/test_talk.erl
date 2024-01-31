@@ -5,17 +5,16 @@
 -include_lib("eunit/include/eunit.hrl").
 
 forward_test() ->
-    % Create a new canvas and turtle
-    CanvasPid = turtletalk:new_canvas(),
-    TurtlePid = turtletalk:new_turtle(CanvasPid),
+    {ok, CanvasPid} = turtletalk:new_canvas(),
+    {ok, TurtlePid} = turtletalk:new_turtle(CanvasPid),
 
-    % Move the turtle forward by 10 units
-    turtletalk:forward(TurtlePid, 10),
+    %% Move the turtle forward by 10 units
+    ok = turtletalk:forward(TurtlePid, 10),
 
-    % Get the current position of the turtle
+    %% Get the current position of the turtle
     {ok, Position} = turtletalk:position(TurtlePid),
 
-    % Check if the position is as expected (assuming starting position is {0, 0})
+    %% Check if the position is as expected (assuming starting position is {0, 0} and moving North)
     ?assertEqual({0, 10}, Position).
 
 anti_clockwise_test() ->

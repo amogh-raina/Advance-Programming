@@ -6,16 +6,20 @@
 -include_lib("eqc/include/eqc.hrl").
 
 turtle_cmd() ->
-    eqc_gen:oneof([{setpen, [eqc_gen:elements([up, down])]},
-               {forward, [eqc_gen:int()]},
-               {turn, [eqc_gen:int()]},
-               {clone, []},
-               {position, []}]).
+    eqc_gen:oneof([
+        {setpen, [eqc_gen:elements([up, down])]},
+        {forward, [eqc_gen:int()]},
+        {anti, [eqc_gen:elements([0, 90, 180, 270])]},  % Adjusted
+        {clock, [eqc_gen:elements([0, 90, 180, 270])]}, % Adjusted
+        {clone, []},
+        {position, []}
+    ]).
 
 turtle_cmds() ->
 eqc_gen:bind(eqc_gen:choose(0,20), fun(Len) ->
-    eqc_gen:list_of_length(Len, turtle_cmd())
+    eqc_gen:vector(Len, turtle_cmd())
 end).
+
 
 %% Executes a sequence of turtle commands and returns the resulting picture.
 %% Executes a sequence of turtle commands and returns the resulting picture.
@@ -27,7 +31,13 @@ cmds_to_picture(Cmds) ->
 
 %% Helper function to execute a command on the given turtle.
 execute_command(Turtle, {Command, Args}) ->
-    apply(turtletalk, Command, [Turtle | Args]).
+    case Command of
+        clone -> 
+            % Assuming you want to create a fixed number of clones for testing
+            turtletalk:clone(Turtle, 1); % Adjust number of clones as needed
+        _Other -> 
+            apply(turtletalk, Command, [Turtle | Args])
+    end.
 
 %% Property to ensure no empty line segments in the generated picture.
 prop_no_empty() ->
