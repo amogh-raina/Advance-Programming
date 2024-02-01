@@ -23,8 +23,6 @@ dead_turtle(CanvasID, TurtleID) ->
     CanvasID !{add_dead_turtle, TurtleID},
     ok.
 
-
-
 %%% Colleect Live Turtle Pictures
 collect_live_turtle_pictures(CanvasMap) ->
     maps:fold(fun(_TurtleID, {alive, TurtleData}, Acc) ->

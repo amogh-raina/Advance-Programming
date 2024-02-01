@@ -24,10 +24,10 @@ end).
 %% Executes a sequence of turtle commands and returns the resulting picture.
 %% Executes a sequence of turtle commands and returns the resulting picture.
 cmds_to_picture(Cmds) ->
-    {ok, TurtleID} = turtletalk:new_canvas(),  % Assuming new_canvas starts a new canvas and returns its ID.
-    {ok, Turtle} = turtletalk:new_turtle(TurtleID),  % Create a new turtle on the canvas.
-    lists:foreach(fun(Command) -> execute_command(Turtle, Command) end, Cmds),
-    turtletalk:picture(TurtleID).
+    CanvasID = turtletalk:new_canvas(),  % Assuming new_canvas starts a new canvas and returns its ID.
+    TurtleID = turtletalk:new_turtle(CanvasID),  % Create a new turtle on the canvas.
+    lists:foreach(fun(Command) -> execute_command(TurtleID, Command) end, Cmds),
+    turtletalk:picture(CanvasID).
 
 %% Helper function to execute a command on the given turtle.
 execute_command(Turtle, {Command, Args}) ->

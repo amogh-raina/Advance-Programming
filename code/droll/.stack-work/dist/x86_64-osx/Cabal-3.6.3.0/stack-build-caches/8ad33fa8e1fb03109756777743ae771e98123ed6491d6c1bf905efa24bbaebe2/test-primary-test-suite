@@ -1,0 +1,12 @@
+/Users/shekhar/.ghcup/ghc/9.2.8/lib/ghc-9.2.8/lib/x86_64-osx-ghc-9.2.8/rts-1.0.2/include/ghcversion.h:
+  hash: 9fa7b57985804bb87ace2b7e702757d585d941ffb7ae2bd8c140e62bfaa97a80
+? /Users/shekhar/Documents/GitHub/AP_Exam/code/droll/.stack-work/dist/x86_64-osx/Cabal-3.6.3.0/build/primary-test-suite/autogen/Paths_droll.hs
+: hash: 5e03cbbcd699a76167a0e107c7f9e8e45de7bac258f03a1dc4737a781417e2a3
+? /Users/shekhar/Documents/GitHub/AP_Exam/code/droll/.stack-work/dist/x86_64-osx/Cabal-3.6.3.0/build/primary-test-suite/autogen/cabal_macros.h
+: hash: eb6f3e9a3d965b772b2d1f04e3114f58e80b5a940967f93a797a035ad7708f4e
+/Users/shekhar/Documents/GitHub/AP_Exam/code/droll/droll.cabal:
+  hash: 978528b14bd23788a92de25c5659f1aa9e690d83bcfb5f65e091c9cb5c0fb9df
+/Users/shekhar/Documents/GitHub/AP_Exam/code/droll/package.yaml:
+  hash: 5e4390f8d5cc1e3eab7f57be6dbab16da61429e474991f44eea061b31428d742
+/Users/shekhar/Documents/GitHub/AP_Exam/code/droll/tests/BlackBox.hs:
+  hash: abc0fc64997ef61ed876aac35430d0e85f3de56657570714848c463521d0fca7
