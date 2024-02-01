@@ -1,5 +1,5 @@
 -module(turtletalk).
--export([turtle_init/2, line_segment/3,dead_turtle/2,clone_turtle_map/6,get_canvas/1,count_turtles/1, collect_live_turtle_pictures/1,collect_dead_turtle_pictures/2]).
+-export([turtle_init/2, line_segment/3,dead_turtle/2,clone_turtle_map/6, collect_live_turtle_pictures/1,collect_dead_turtle_pictures/1]).
 -export([new_canvas/0, blast/1, new_turtle/1, picture/1, turtles/1, graveyard/1]).
 -export([forward/2, anti/2, clock/2, setpen/2, clone/2, position/1]).
 
@@ -8,23 +8,22 @@
 %-type picture()  :: [line_seg()].
 
 %%%% Helper Functions %%%%
-%%% Add a line segment in the canvas map for turtle T's drawing history
-%add_line_segment(CanvasMap, T, {PositionA, PositionB}) ->
-    %{_, Segment} = maps:get(T, CanvasMap),
-    %UpdateSegment = Segment ++ [{PositionA, PositionB}],
-    %UpdatedCanvasMap = maps:put(T, {alive, UpdateSegment}, CanvasMap),
-    %UpdatedCanvasMap.
 
+%% Line Segment Function
+line_segment(TurtleID, CanvasID, LineSegment) ->
+    CanvasID ! {add_line_segment,TurtleID, LineSegment},
+    receive
+        {line_added, ok} ->
+            ok;
+        {error, Reason} ->
+            {error, Reason}
+    end.
 %% Logic of dead turtle
-dead_turtle(CanvasMap, T) ->
-    UpdatedCanvasMap = maps:put(T, {dead,[]}, CanvasMap),
-    UpdatedCanvasMap.
+dead_turtle(CanvasID, TurtleID) ->
+    CanvasID !{add_dead_turtle, TurtleID},
+    ok.
 
-%% Count Alive and Dead Turtles
-count_turtles(CanvasMap) ->
-    LiveTurtles = [T || {T, {alive, _}} <- maps:to_list(CanvasMap)],
-    DeadTurtles = [T || {T, {dead, _}} <- maps:to_list(CanvasMap)],
-    {LiveTurtles, length(DeadTurtles)}.
+
 
 %%% Colleect Live Turtle Pictures
 collect_live_turtle_pictures(CanvasMap) ->
@@ -37,26 +36,28 @@ collect_live_turtle_pictures(CanvasMap) ->
 
 
 %% colleect dead turtle pictures
-collect_dead_turtle_pictures([], Pictures) ->
-    lists:reverse(Pictures);
-collect_dead_turtle_pictures([{_, {dead, TurtleData}} | Rest], Pictures) ->
-    {_, TurtlePictures} = TurtleData,
-    collect_dead_turtle_pictures(Rest, [TurtlePictures | Pictures]);
-collect_dead_turtle_pictures([_|Rest], Pictures) ->
-    collect_dead_turtle_pictures(Rest, Pictures).
-%% Get Canvas Map from CanvasID
+collect_dead_turtle_pictures(CanvasMap) ->
+    maps:fold(fun(_TurtleID, {dead, TurtleData}, Acc) ->
+                    TurtlePictures = TurtleData,
+                    [TurtlePictures | Acc];
+                  (_, _, Acc) ->
+                    Acc
+              end, [], CanvasMap).
 
 %% Clone Turtle Map Function
 clone_turtle_map(_C, _Position, _Angle, _PenState, TurtleList, 0) ->
     TurtleList;
 clone_turtle_map(C, Position, Angle, PenState, TurtleList, N) when N > 0 ->
+    io:format("Cloning turtle, remaining: ~p.~n", [N]),
     T = new_turtle(C),
+    io:format("New turtle created: ~p.~n", [T]),
     clone_turtle_map(C, Position, Angle, PenState, [{T, {alive, []}} | TurtleList], N - 1).
 
-% Initialize a canvas process with a given ID
+% Initialize a canvas process
 new_canvas() ->
    CanvasId = spawn(fun() -> canvas_loop(#{}) end),
    CanvasId.
+
 % Initialize a turtle process with a given canvas ID
 new_turtle(CanvasId) ->
     TurtleID = spawn(fun() -> turtle_init(CanvasId,self()) end),
@@ -77,14 +78,18 @@ turtle_init(CanvasId,TurtleID) ->
 %% Turtle Loop API
 turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) -> 
     receive
-        {From, forward, N} ->
-            CurrentTurtle = {C, {X, Y}, Angle, PenState},
+        {From, forward, N} when is_integer(N) ->
             io:format("Received forward command with N = ~p.~n", [N]), % Check received command
             case N of
                 0 ->
-                    From ! {ok, CurrentTurtle},
-                    turtle_loop(TurtleID,C, {X, Y}, Angle, PenState);
-                
+                    From ! {TurtleID, ok},
+                    turtle_loop(TurtleID, C, {X, Y}, Angle, PenState);
+
+                N when N<0 ->
+                    io:format("Error: Invalid format of N ~p.~n", [N]),
+                    From ! {TurtleID, {error, "Invalid format of N"}},
+                    dead_turtle(C, TurtleID),
+                    turtle_loop(TurtleID, C, {X, Y}, Angle, PenState);
                 N when N>0 ->
                     io:format("Moving forward with N = ~p.~n", [N]),
                     NewPosition =
@@ -99,7 +104,9 @@ turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) ->
                                 {X, Y - N};
                             _ ->
                                 io:format("Error: Invalid angle ~p.~n", [Angle]),
-                                {X, Y} % Keeping the same position for invalid angle % Invalid angle, keep the same position
+                                dead_turtle(C, TurtleID),
+                                From ! {TurtleID, {error, "Invalid format of Angle"}},
+                                turtle_loop(TurtleID,C, {X, Y}, Angle, PenState) % Keeping the same position for invalid angle % Invalid angle, keep the same position
                             end,
                             NewTurtle = {C, NewPosition, Angle, PenState},
                             io:format("New Position calculated as ~p.~n", [NewPosition]),
@@ -121,12 +128,10 @@ turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) ->
                                 
 
                         end;
-                _->
-                    io:format("Error: Negative move value ~p.~n", [N]),
-                    {ok, CanvasMap} = get_canvas(C),
-                    dead_turtle(CanvasMap, self()),
-                    From ! {error, "Negative move value"},
-                    {X, Y}
+            _ ->
+                From ! {TurtleID, {error, "Invalid movement value"}},
+                dead_turtle(C, TurtleID),
+                turtle_loop(TurtleID, C, {X, Y}, Angle, PenState)
             
 
             
@@ -142,60 +147,60 @@ turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) ->
                     io:format("Sent ok response to ~p from TurtleID ~p.~n", [From, TurtleID]),
                     turtle_loop(TurtleID, C, {X, Y}, Anti_Angle, PenState);
                 false ->
-                    From ! {TurtleID, {error, "Invalid angle"}},
-                    turtle_loop(TurtleID, C, {X, Y}, Angle, PenState)
+                    dead_turtle(C, TurtleID),
+                    From ! {TurtleID,{error, "Invalid angle"}}
     end;
                     
-       
-     {From, clock, Degree} ->
-        case lists:member(Degree, [0, 90, 180, 270]) of
-            true ->
-                    New_Angle = Angle - Degree,
-                    case New_Angle < 0 of
-                        true ->
-                            Clock_Angle = New_Angle + 360,
-                            turtle_loop(TurtleID,C, {X, Y}, Clock_Angle, PenState);
-                        false ->
-                            turtle_loop(TurtleID,C, {X, Y}, New_Angle, PenState)
-                    end;
-            false ->
-                {ok, CanvasMap} = get_canvas(C),
-                dead_turtle(CanvasMap, self()),
-                From ! {error, "Invalid angle"}
-        end;
-
-    {From, setpen, NewPenState} ->
-        case NewPenState of
-            up ->
-                NewTurtle = {C, {X,Y}, Angle, up},
-                {reply, ok, NewTurtle},
-                turtle_loop(TurtleID,C, {X, Y}, Angle, NewPenState);
-            down -> 
-                NewTurtle = {C, {X,Y}, Angle, down},
-                {reply, ok, NewTurtle},
-                turtle_loop(TurtleID,C, {X, Y}, Angle, NewPenState);
-            _ ->
-                {ok, CanvasMap} = get_canvas(C),
-                dead_turtle(CanvasMap, self()),
-                From ! {error, "Invalid angle"}
+        {From, clock, Degree} ->
+            io:format("Received Clock command with Degree = ~p.~n", [Degree]),
+            case lists:member(Degree, [0, 90, 180, 270]) of
+                true ->
+                    Clock_Angle = abs(Angle - Degree),
+                    io:format("Clock angle calculated as ~p.~n", [Clock_Angle]),
+                    From ! {TurtleID, ok},
+                    io:format("Sent ok response to ~p from TurtleID ~p.~n", [From, TurtleID]),
+                    turtle_loop(TurtleID, C, {X, Y}, Clock_Angle, PenState);
+                false ->
+                    dead_turtle(C, TurtleID),
+                    From ! {TurtleID,{error, "Invalid angle"}}
+    end;
+        
+        {From, setpen, NewPenState} ->
+            case NewPenState of
+                up ->
+                    turtle_loop(TurtleID,C, {X, Y}, Angle, NewPenState);
+                down ->
+                    turtle_loop(TurtleID,C, {X, Y}, Angle, NewPenState);
+                _ ->
+                    dead_turtle(C, TurtleID),
+                    From ! {TurtleID,{error, "Invalid Pen State"}}
     end;
 
-    {From, clone, N} ->
+    {From, clone, N} when is_integer(N)->
             case N >= 0 of
                 true ->
+                    io:format("Starting cloning process for ~p times.~n", [N]),
                     TurtleList = clone_turtle_map(C, {X, Y}, Angle, PenState, [], N),
                    % NewTurtle = {C, {X, Y}, Angle, PenState},
-                    From ! {ok, TurtleList},
-                    turtle_loop(TurtleID,C, {X, Y}, Angle, PenState);
+                    ClonedTurtleIDs = [TID || {TID, _} <- TurtleList],
+                    io:format("Cloning successful, created Turtles: ~p.~n", [ClonedTurtleIDs]),
+                    % Respond with the list of new turtle IDs
+                    From ! {ok, ClonedTurtleIDs};
                 false ->
-                    {ok, CanvasMap} = get_canvas(C),
-                dead_turtle(CanvasMap, self()),
-                From ! {error, "Invalid angle"}
-            end;
-   {From, position, P} -> 
-        P = {self(), {ok, {X, Y}}},
-        From ! P,
-        turtle_loop(TurtleID,C, {X, Y}, Angle, PenState);
+                    io:format("Clone command received with invalid N: ~p.~n", [N]),
+                    dead_turtle(C, TurtleID),
+                    From ! {TurtleID,{error, "Invalid value of N"}}
+            end,
+            turtle_loop(TurtleID,C, {X, Y}, Angle, PenState);
+   {From, position} -> 
+        Reply = {ok, {X, Y}},
+        From ! Reply, % Send the position back to the requester
+        turtle_loop(TurtleID, C, {X, Y}, Angle, PenState);
+
+    {terminate} ->
+        io:format("Turtle ~p is terminating.~n", [TurtleID]),
+        exit(normal); % Terminate the turtle process
+    
     _Other ->
         io:format("Unexpected message received by Turtle: ~p~n", [_Other])
 
@@ -203,10 +208,8 @@ turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) ->
 
 
 
-%% Canvas API
+%% Canvas Loop API
 
-     
-% Canvas loop function
 canvas_loop(CanvasMap) ->
     receive
         {add_new_turtle, TurtleID} ->
@@ -228,29 +231,48 @@ canvas_loop(CanvasMap) ->
                     io:format("Failed to add line segment: Turtle ~p not found.~n", [TurtleID]),
                     canvas_loop(CanvasMap)
             end;
+        {add_dead_turtle, TurtleID} ->
+            io:format("Updating state of Turtle ~p to dead.~n", [TurtleID]),
+            io:format("CanvasMap before update: ~p~n", [CanvasMap]),
+            UpdatedCanvasMap = maps:map(fun(TID, {Status, Segments}) when TID == TurtleID, Status == alive ->
+                {dead, Segments};
+           (_, Value) -> Value
+        end, CanvasMap),
+            io:format("CanvasMap after update: ~p~n", [UpdatedCanvasMap]),
+            canvas_loop(UpdatedCanvasMap),
+            io:format("Still running??: ~n");
 
-        {_, blast} ->
-            {reply, ok};
+
+        {From, blast} ->
+            maps:foreach(
+                fun(TurtleID, _Value) ->
+                TurtleID ! {terminate} % Send a terminate message to each turtle
+                end, CanvasMap),
+            From ! {reply, ok}, % Reply to the sender before terminating
+            io:format("Canvas and all turtles are being terminated.~n"),
+            exit(normal);
 
         {From, picture} -> 
-                LiveTurtlePictures = collect_live_turtle_pictures(CanvasMap),
-                CombinedPicture = lists:concat(LiveTurtlePictures),
-                io:format("Sending picture to ~p.~n", [From]),
-                io:format("Sending picture response from Canvas ~p.~n", [self()]),
-                From ! {reply, ok, CombinedPicture},
-                canvas_loop(CanvasMap);
+            LiveTurtlePictures = collect_live_turtle_pictures(CanvasMap),
+            CombinedPicture = lists:concat(LiveTurtlePictures),
+            io:format("Sending picture to ~p.~n", [From]),
+            io:format("Sending picture response from Canvas ~p.~n", [self()]),
+            From ! {reply, ok, CombinedPicture},
+            canvas_loop(CanvasMap);
 
 
         {From, turtles} ->
-            {LiveTurtles, DeadTurtles} = count_turtles(CanvasMap),
-            From ! {reply, ok, {LiveTurtles, DeadTurtles}},
+            LiveTurtles = [T || {T, {alive, _}} <- maps:to_list(CanvasMap)],
+            DeadTurtles = [T || {T, {dead, _}} <- maps:to_list(CanvasMap)],
+            DeadTurtleCount = length(DeadTurtles),
+            From ! {ok, {LiveTurtles, DeadTurtleCount}},
             canvas_loop(CanvasMap);
 
         {From, graveyard} ->
-            DeadTurtlePictures = collect_dead_turtle_pictures(CanvasMap, []),
-
-            % Concatenate the pictures
+            DeadTurtlePictures = collect_dead_turtle_pictures(CanvasMap),
             CombinedGraveyardPicture = lists:concat(DeadTurtlePictures),
+            io:format("Sending picture to ~p.~n", [From]),
+            io:format("Sending picture response from Canvas ~p.~n", [self()]),
 
             From ! {reply, ok, CombinedGraveyardPicture},
             canvas_loop(CanvasMap);
@@ -258,16 +280,8 @@ canvas_loop(CanvasMap) ->
             io:format("Invalid message received by Canvas: ~p~n", [_Other]),
             canvas_loop(CanvasMap)
     end.
-%%%%%%%%%%%
-line_segment(TurtleID, CanvasID, LineSegment) ->
-    CanvasID ! {add_line_segment,TurtleID, LineSegment},
-    receive
-        {line_added, ok} ->
-            ok;
-        {error, Reason} ->
-            {error, Reason}
-    end.
 
+%%%%%%%%%%%%%%
 
 % Receive calls for Turtle_loop
 forward(TurtleID, N) -> 
@@ -287,42 +301,46 @@ anti(TurtleID, Degree) ->
         {TurtleID, {error, Reason}} -> 
             {error, Reason}
     end.
-clock(T, Degree) ->
-    T ! {self(), clock, Degree},
+clock(TurtleID, Degree) -> 
+    TurtleID ! {self(), clock, Degree},
     receive
-        ok -> ok;
-        {error, Reason} -> {error, Reason}
+        {TurtleID, ok} -> 
+            ok;
+        {TurtleID, {error, Reason}} -> 
+            {error, Reason}
     end.
-
 setpen(T, P) -> 
     T ! {self(), setpen, P},ok.
 
 clone(T, N) ->
-    T ! {self(), {clone, N}},
+    io:format("Sending clone request to Turtle ~p with N = ~p.~n", [T, N]),
+    T ! {self(), clone, N},
     receive
-        {ok, TurtleList} -> {ok, TurtleList};
-        {error, Reason} -> {error, Reason}
+        {ok, TurtleList} -> 
+            io:format("Received cloned TurtleList: ~p.~n", [TurtleList]),
+            {ok, TurtleList};
+        {error, Reason} -> 
+            io:format("Received error during cloning: ~p.~n", [Reason]),
+            {error, Reason}
     end.
 
 position(T) -> 
     T ! {self(), position},
     receive
-        {ok, Position} -> {ok, Position}
+        {ok, Position} -> {ok, Position};
+        _ -> 
+            {error, "Failed to get position"}
     end.
 
 %% Receive calls for Canvas_loop
-get_canvas(CanvasID) ->
-    CanvasID ! {self(), get_canvas},
+
+blast(CanvasID) ->
+    CanvasID ! {self(), blast},
     receive
-        {canvas_map, CanvasMap} ->
-            CanvasMap
-        % Add handling for potential timeouts or errors
-    end.
-blast(Canvas) ->
-    Canvas ! {self(), blast},
-    receive
-        ok -> ok;
-        {error, Reason} -> {error, Reason}
+        {reply, ok} -> 
+            ok;
+        _ -> 
+            {error, "Failed to blast canvas"}
     end.
 
 picture(CanvasID) -> 
@@ -333,16 +351,18 @@ picture(CanvasID) ->
         {error, Reason} -> 
             {error, Reason}
     end.
-turtles(Canvas) ->
-    Canvas ! {self(), turtles},
+turtles(CanvasID) ->
+    CanvasID ! {self(), turtles},
     receive
         {ok,{LA,N}} -> {ok,{LA,N}};
         {error, Reason} -> {error, Reason}
     end.
 
-graveyard(Canvas) ->
-    Canvas ! {self(), graveyard},
+graveyard(CanvasID) ->
+    CanvasID ! {self(), graveyard},
     receive
-        ok -> ok;
-        {error, Reason} -> {error, Reason}
+        {reply, ok, Picture} -> 
+            {ok, Picture};
+        {error, Reason} -> 
+            {error, Reason}
     end.
