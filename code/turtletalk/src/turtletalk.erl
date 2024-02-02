@@ -46,9 +46,9 @@ collect_dead_turtle_pictures(CanvasMap) ->
 clone_turtle_map(_C, _Position, _Angle, _PenState, TurtleList, 0) ->
     TurtleList;
 clone_turtle_map(C, Position, Angle, PenState, TurtleList, N) when N > 0 ->
-    io:format("Cloning turtle, remaining: ~p.~n", [N]),
+    %io:format("Cloning turtle, remaining: ~p.~n", [N]),
     T = new_turtle(C),
-    io:format("New turtle created: ~p.~n", [T]),
+    %io:format("New turtle created: ~p.~n", [T]),
     clone_turtle_map(C, Position, Angle, PenState, [{T, {alive, []}} | TurtleList], N - 1).
 
 % Initialize a canvas process
@@ -77,14 +77,14 @@ turtle_init(CanvasId,TurtleID) ->
 turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) -> 
     receive
         {From, forward, N} when is_integer(N) ->
-            io:format("Received forward command with N = ~p.~n", [N]), % Check received command
+            %io:format("Received forward command with N = ~p.~n", [N]), % Check received command
             case N of
                 0 ->
                     From ! {TurtleID, ok},
                     turtle_loop(TurtleID, C, {X, Y}, Angle, PenState);
 
                 N when N<0 ->
-                    io:format("Error: Invalid format of N ~p.~n", [N]),
+                    %io:format("Error: Invalid format of N ~p.~n", [N]),
                     From ! {TurtleID, {error, "Invalid format of N"}},
                     dead_turtle(C, TurtleID),
                     turtle_loop(TurtleID, C, {X, Y}, Angle, PenState);
@@ -106,7 +106,7 @@ turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) ->
                                 From ! {TurtleID, {error, "Invalid format of Angle"}},
                                 turtle_loop(TurtleID,C, {X, Y}, Angle, PenState) % Keeping the same position for invalid angle % Invalid angle, keep the same position
                             end,
-                            NewTurtle = {C, NewPosition, Angle, PenState},
+                        
                             io:format("New Position calculated as ~p.~n", [NewPosition]),
                             case PenState of 
                                 down ->
@@ -121,13 +121,13 @@ turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) ->
                                                 end;
                                     up ->
                                         io:format("Pen is up, moving without drawing from ~p to ~p.~n", [{X, Y}, NewPosition]),
-                                        From ! {ok, NewTurtle},
+                                        From ! {TurtleID, ok},
                                         turtle_loop(TurtleID, C, NewPosition, Angle, PenState)
                                 
 
                         end;
             _ ->
-                From ! {TurtleID, {error, "Invalid movement value"}},
+                From ! {TurtleID, {error, "Invalid movement value"}},  %% Not handing message-response for this case
                 dead_turtle(C, TurtleID),
                 turtle_loop(TurtleID, C, {X, Y}, Angle, PenState)
             
@@ -136,13 +136,13 @@ turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) ->
         end;
 
         {From, anti, Degree} ->
-            io:format("Received anti command with Degree = ~p.~n", [Degree]),
+            %io:format("Received anti command with Degree = ~p.~n", [Degree]),
             case lists:member(Degree, [0, 90, 180, 270]) of
                 true ->
                     Anti_Angle = (Angle + Degree) rem 360,
                     io:format("Anti angle calculated as ~p.~n", [Anti_Angle]),
-                    From ! {TurtleID, ok},
-                    io:format("Sent ok response to ~p from TurtleID ~p.~n", [From, TurtleID]),
+                    From !  {TurtleID,ok},
+                    %io:format("Sent ok response to ~p from TurtleID ~p.~n", [From, TurtleID]),
                     turtle_loop(TurtleID, C, {X, Y}, Anti_Angle, PenState);
                 false ->
                     dead_turtle(C, TurtleID),
@@ -150,13 +150,13 @@ turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) ->
     end;
                     
         {From, clock, Degree} ->
-            io:format("Received Clock command with Degree = ~p.~n", [Degree]),
+            %io:format("Received Clock command with Degree = ~p.~n", [Degree]),
             case lists:member(Degree, [0, 90, 180, 270]) of
                 true ->
                     Clock_Angle = abs(Angle - Degree),
                     io:format("Clock angle calculated as ~p.~n", [Clock_Angle]),
                     From ! {TurtleID, ok},
-                    io:format("Sent ok response to ~p from TurtleID ~p.~n", [From, TurtleID]),
+                    %io:format("Sent ok response to ~p from TurtleID ~p.~n", [From, TurtleID]),
                     turtle_loop(TurtleID, C, {X, Y}, Clock_Angle, PenState);
                 false ->
                     dead_turtle(C, TurtleID),
@@ -177,7 +177,7 @@ turtle_loop(TurtleID, C, {X, Y}, Angle, PenState) ->
     {From, clone, N} when is_integer(N)->
             case N >= 0 of
                 true ->
-                    io:format("Starting cloning process for ~p times.~n", [N]),
+                    %io:format("Starting cloning process for ~p times.~n", [N]),
                     TurtleList = clone_turtle_map(C, {X, Y}, Angle, PenState, [], N),
                    % NewTurtle = {C, {X, Y}, Angle, PenState},
                     ClonedTurtleIDs = [TID || {TID, _} <- TurtleList],
@@ -230,15 +230,15 @@ canvas_loop(CanvasMap) ->
                     canvas_loop(CanvasMap)
             end;
         {add_dead_turtle, TurtleID} ->
-            io:format("Updating state of Turtle ~p to dead.~n", [TurtleID]),
-            io:format("CanvasMap before update: ~p~n", [CanvasMap]),
+            %io:format("Updating state of Turtle ~p to dead.~n", [TurtleID]),
+            %io:format("CanvasMap before update: ~p~n", [CanvasMap]),
             UpdatedCanvasMap = maps:map(fun(TID, {Status, Segments}) when TID == TurtleID, Status == alive ->
                 {dead, Segments};
            (_, Value) -> Value
         end, CanvasMap),
             io:format("CanvasMap after update: ~p~n", [UpdatedCanvasMap]),
-            canvas_loop(UpdatedCanvasMap),
-            io:format("Still running??: ~n");
+            canvas_loop(UpdatedCanvasMap);
+            %io:format("Still running??: ~n");
 
 
         {From, blast} ->
@@ -253,8 +253,8 @@ canvas_loop(CanvasMap) ->
         {From, picture} -> 
             LiveTurtlePictures = collect_live_turtle_pictures(CanvasMap),
             CombinedPicture = lists:concat(LiveTurtlePictures),
-            io:format("Sending picture to ~p.~n", [From]),
-            io:format("Sending picture response from Canvas ~p.~n", [self()]),
+            %io:format("Sending picture to ~p.~n", [From]),
+            %io:format("Sending picture response from Canvas ~p.~n", [self()]),
             From ! {reply, ok, CombinedPicture},
             canvas_loop(CanvasMap);
 
@@ -269,7 +269,7 @@ canvas_loop(CanvasMap) ->
         {From, graveyard} ->
             DeadTurtlePictures = collect_dead_turtle_pictures(CanvasMap),
             CombinedGraveyardPicture = lists:concat(DeadTurtlePictures),
-            io:format("Sending picture to ~p.~n", [From]),
+            %io:format("Sending picture to ~p.~n", [From]),
             io:format("Sending picture response from Canvas ~p.~n", [self()]),
 
             From ! {reply, ok, CombinedGraveyardPicture},
@@ -311,7 +311,7 @@ setpen(T, P) ->
     T ! {self(), setpen, P},ok.
 
 clone(T, N) ->
-    io:format("Sending clone request to Turtle ~p with N = ~p.~n", [T, N]),
+    %io:format("Sending clone request to Turtle ~p with N = ~p.~n", [T, N]),
     T ! {self(), clone, N},
     receive
         {ok, TurtleList} -> 

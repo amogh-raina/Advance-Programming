@@ -42,12 +42,12 @@ getBinDir, getLibDir, getDynLibDir, getDataDir, getLibexecDir, getSysconfDir :: 
 
 
 bindir, libdir, dynlibdir, datadir, libexecdir, sysconfdir :: FilePath
-bindir     = "C:\\Users\\AMOGH\\Desktop\\Advanced Programming\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\bin"
-libdir     = "C:\\Users\\AMOGH\\Desktop\\Advanced Programming\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\lib\\x86_64-windows-ghc-9.2.8\\droll-0.0.0-9tAulSyRrZJ8bLFY4ZgYsa-droll"
-dynlibdir  = "C:\\Users\\AMOGH\\Desktop\\Advanced Programming\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\lib\\x86_64-windows-ghc-9.2.8"
-datadir    = "C:\\Users\\AMOGH\\Desktop\\Advanced Programming\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\share\\x86_64-windows-ghc-9.2.8\\droll-0.0.0"
-libexecdir = "C:\\Users\\AMOGH\\Desktop\\Advanced Programming\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\libexec\\x86_64-windows-ghc-9.2.8\\droll-0.0.0"
-sysconfdir = "C:\\Users\\AMOGH\\Desktop\\Advanced Programming\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\etc"
+bindir     = "C:\\Users\\AMOGH\\Desktop\\Advanced_Programming\\AP_Exam\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\bin"
+libdir     = "C:\\Users\\AMOGH\\Desktop\\Advanced_Programming\\AP_Exam\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\lib\\x86_64-windows-ghc-9.2.8\\droll-0.0.0-GsQXRfrCtbW7iqqZuwSkSk-droll"
+dynlibdir  = "C:\\Users\\AMOGH\\Desktop\\Advanced_Programming\\AP_Exam\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\lib\\x86_64-windows-ghc-9.2.8"
+datadir    = "C:\\Users\\AMOGH\\Desktop\\Advanced_Programming\\AP_Exam\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\share\\x86_64-windows-ghc-9.2.8\\droll-0.0.0"
+libexecdir = "C:\\Users\\AMOGH\\Desktop\\Advanced_Programming\\AP_Exam\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\libexec\\x86_64-windows-ghc-9.2.8\\droll-0.0.0"
+sysconfdir = "C:\\Users\\AMOGH\\Desktop\\Advanced_Programming\\AP_Exam\\AP_Exam\\code\\droll\\.stack-work\\install\\3110aff0\\etc"
 
 getBinDir     = catchIO (getEnv "droll_bindir")     (\_ -> return bindir)
 getLibDir     = catchIO (getEnv "droll_libdir")     (\_ -> return libdir)

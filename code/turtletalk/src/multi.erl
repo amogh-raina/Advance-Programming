@@ -2,8 +2,8 @@
 -export([draw/0, draw_to/2]).
 
 draw() ->
-    {ok, C1} = turtletalk:new_canvas(),
-    {ok, T1} = turtletalk:new_turtle(C1),
+    {ok, C1} = turtletalk:new_canvas(),  %%  C = turtletalk:new_canvas() -> This is the pattern matching I'm doing in my turtletalk.erl file. So change if running this
+    {ok, T1} = turtletalk:new_turtle(C1), %% T = turtletalk:new_turtle(C) -> This is the pattern matching I'm doing in my turtletalk.erl file. So change if running this
 
     {ok, C2} = turtletalk:new_canvas(),
     {ok, T2} = turtletalk:new_turtle(C2),

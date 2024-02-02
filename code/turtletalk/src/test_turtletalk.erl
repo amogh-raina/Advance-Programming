@@ -41,6 +41,8 @@ execute_command(Turtle, {Command, Args}) ->
 
 %% Property to ensure no empty line segments in the generated picture.
 prop_no_empty() ->
+
+
     ?FORALL(Cmds, turtle_cmds(),
             begin
                 Picture = cmds_to_picture(Cmds),
@@ -50,8 +52,13 @@ prop_no_empty() ->
 %% @doc Checks that the picture contains no empty line segments.
 %% An empty line segment is defined as having identical start and end points.
 %% @spec no_empty_segments([{{integer(), integer()}, {integer(), integer()}}]) -> boolean().
-no_empty_segments(Picture) ->
-    lists:all(fun({Start, End}) -> Start =/= End end, Picture).
+no_empty_segments(Result) ->
+    case Result of
+        {ok, Picture} -> 
+            lists:all(fun({Start, End}) -> Start =/= End end, Picture);
+        [] -> % Handle the empty picture case or other cases as needed
+            true
+    end.
 test_all() ->
     eqc:quickcheck(prop_no_empty()).
 test_everything() -> test_all().
